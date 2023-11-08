@@ -90,7 +90,7 @@ df.createOrReplaceTempView("RawSales")
 # MAGIC   INNER JOIN qty_table b ON a.sales_main_key = b.sales_main_key
 # MAGIC WHERE
 # MAGIC   total_qty != 0
-# MAGIC   AND order_date >= "2022-04-01" AND order_date <= "2023-03-31" 
+# MAGIC   AND order_date >= "2022-11-01" AND order_date <= "2023-10-31" 
 # MAGIC   AND shop_brand = 'JB'
 
 # COMMAND ----------
@@ -120,7 +120,8 @@ df.createOrReplaceTempView("RawSales")
 # MAGIC     CAST(last_modified_date AS DATE) AS last_modified_date
 # MAGIC FROM
 # MAGIC     imx_prd.imx_dw_train_silver.dbo_viw_lc_cs2k_item_sku
-# MAGIC ),
+# MAGIC )
+# MAGIC ,
 # MAGIC SkuTable AS (
 # MAGIC SELECT
 # MAGIC     a.*
@@ -135,7 +136,6 @@ df.createOrReplaceTempView("RawSales")
 # MAGIC         GROUP BY
 # MAGIC             item_code
 # MAGIC     ) b ON a.item_code = b.item_code AND a.last_modified_date = b.MaxDateTime
-# MAGIC WHERE brand_code IN ("JB")
 # MAGIC ), 
 # MAGIC cleaned_maincat AS (
 # MAGIC   SELECT 
@@ -186,11 +186,10 @@ df.createOrReplaceTempView("RawSales")
 # MAGIC   ) b ON a.item_sub_cat = b.item_sub_cat
 # MAGIC   AND a.load_date = b.MaxDateTime
 # MAGIC   AND a.item_brand_key = b.item_brand_key
-# MAGIC   AND item_cat NOT IN (
-# MAGIC     "ZZ",
-# MAGIC     "ZZZ"
-# MAGIC   )
-# MAGIC   WHERE a.item_brand_key IN ("JB")
+# MAGIC   -- AND item_cat NOT IN (
+# MAGIC   --   "ZZ",
+# MAGIC   --   "ZZZ"
+# MAGIC   -- )
 
 # COMMAND ----------
 
@@ -268,7 +267,7 @@ df.createOrReplaceTempView("RawSales")
 # MAGIC     JoyceBeautySales a
 # MAGIC     LEFT JOIN SkuTable b ON a.item_code = b.item_code
 # MAGIC     AND a.prod_brand = b.brand_code
-# MAGIC     LEFT JOIN ItemSubcat c ON c.item_brand_key = a.shop_brand
+# MAGIC     LEFT JOIN ItemSubcat c ON c.item_brand_key = a.prod_brand
 # MAGIC     AND c.item_sub_cat = b.item_sub_cat
 # MAGIC     AND c.item_cat = b.item_cat
 # MAGIC     LEFT JOIN StoreLocation d USING (shop_code)
@@ -340,32 +339,6 @@ df.createOrReplaceTempView("RawSales")
 # MAGIC SELECT  
 # MAGIC   *
 # MAGIC FROM cleaned_sales_vip
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC select distinct region_key from JBSalesProduct
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC select * from JBSalesProduct
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC select * from JBSalesVip
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC select count(distinct vip_main_no) from JBSalesProduct
-# MAGIC inner join JBSalesVip USING (VIP_MAIN_NO)
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC describe table imx_prd.imx_dw_train_silver.dbo_viw_lc_sales_vip_masked
 
 # COMMAND ----------
 
