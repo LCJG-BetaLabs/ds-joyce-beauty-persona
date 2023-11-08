@@ -293,16 +293,6 @@ df.createOrReplaceTempView("RawSales")
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC select count(distinct vip_main_no) from JBSalesProduct
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC select sum(net_amt_hkd) from JBSalesProduct
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## demographic data
 
