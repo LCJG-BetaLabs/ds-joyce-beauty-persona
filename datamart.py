@@ -1,15 +1,4 @@
 # Databricks notebook source
-# MAGIC %sql
-# MAGIC -- TODO: move to joyce persona volume
-# MAGIC CREATE
-# MAGIC OR REPLACE TEMPORARY VIEW jb_subcat USING CSV OPTIONS (
-# MAGIC     path "/mnt/prd/crm_dashboard/imx/JB_subcat.csv",
-# MAGIC     header "true",
-# MAGIC     mode "PERMISSIVE"
-# MAGIC );
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## transaction data
 
@@ -271,8 +260,7 @@ df.createOrReplaceTempView("RawSales")
 # MAGIC     AND c.item_sub_cat = b.item_sub_cat
 # MAGIC     AND c.item_cat = b.item_cat
 # MAGIC     LEFT JOIN StoreLocation d USING (shop_code)
-# MAGIC ), 
-# MAGIC filtered AS (
+# MAGIC )
 # MAGIC SELECT 
 # MAGIC   DISTINCT *
 # MAGIC FROM RawJBSalesProduct
@@ -283,13 +271,7 @@ df.createOrReplaceTempView("RawSales")
 # MAGIC   AND order_date != "2021-02-27"
 # MAGIC   AND valid_tx_flag = 1
 # MAGIC   AND isnull(void_flag) = 1
-# MAGIC )
-# MAGIC SELECT
-# MAGIC     a.*,
-# MAGIC     b.item_subcat_desc AS item_subcat_desc_from_csv
-# MAGIC FROM
-# MAGIC     filtered a
-# MAGIC     LEFT JOIN jb_subcat b ON a.item_sub_cat = b.item_sub_cat
+# MAGIC
 
 # COMMAND ----------
 
