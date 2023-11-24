@@ -1,5 +1,6 @@
 # Databricks notebook source
 import os
+import pandas as pd
 import pyspark.sql.functions as f
 
 base_dir = "/mnt/dev/customer_segmentation/imx/joyce_beauty/datamart"
@@ -14,10 +15,12 @@ item_attr_tagging = spark.read.parquet(os.path.join(base_dir, "item_attr_tagging
 feature_dir = "/mnt/dev/customer_segmentation/imx/joyce_beauty/features"
 os.makedirs(feature_dir, exist_ok=True)
 
+
 # COMMAND ----------
 
 def save_feature_df(df, filename):
     df.write.parquet(os.path.join(feature_dir, f"{filename}.parquet"), mode="overwrite")
+
 
 # COMMAND ----------
 
@@ -45,6 +48,7 @@ first_purchase.createOrReplaceTempView("first_purchase")
 
 sales = spark.table("sales")
 
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -55,6 +59,7 @@ sales = spark.table("sales")
 def features_in_list_by_vip(feature, table=sales):
     grouped_df = table.groupBy("vip_main_no").agg(f.collect_list(feature).alias(feature))
     return grouped_df
+
 
 # COMMAND ----------
 
@@ -70,36 +75,21 @@ def count_encoding(feature, table=sales, prefix="", postfix="_qty"):
     df = df.toDF(*renamed_columns)
     return df
 
+
 # COMMAND ----------
 
 subcat = count_encoding("item_subcat_desc_cleaned", prefix="subcat_")
-display(subcat)
-
-# COMMAND ----------
-
 save_feature_df(subcat, "subcat")
 
 # COMMAND ----------
 
 maincat = count_encoding("maincat_desc_cleaned", prefix="maincat_")
-display(maincat)
-
-# COMMAND ----------
-
 save_feature_df(maincat, "maincat")
 
 # COMMAND ----------
 
 prod_brand = count_encoding("prod_brand", prefix="brand_")
-display(prod_brand)
-
-# COMMAND ----------
-
 save_feature_df(prod_brand, "brand")
-
-# COMMAND ----------
-
-display(sales)
 
 # COMMAND ----------
 
@@ -107,10 +97,6 @@ display(sales)
 temp = sales.join(item_attr_tagging.select("item_desc", "tags"), on="item_desc", how="left")
 exploded_df = temp.select("vip_main_no", f.explode("tags").alias("tags"), "sold_qty")
 tagging = count_encoding("tags", table=exploded_df, prefix="tag_")
-display(tagging)
-
-# COMMAND ----------
-
 save_feature_df(tagging, "tagging")
 
 # COMMAND ----------
@@ -180,30 +166,8 @@ group by
 
 # COMMAND ----------
 
-demographic.count()
-
-# COMMAND ----------
-
-display(demographic)
-
-# COMMAND ----------
-
 demo = demographic.toPandas()
-
-# COMMAND ----------
-
-demo
-
-# COMMAND ----------
-
-import pandas as pd
-
-
 encoded_df = pd.get_dummies(demo, columns=["customer_sex", "cust_nat_cat", "tenure", "age"])
-encoded_df
-
-# COMMAND ----------
-
 df = spark.createDataFrame(encoded_df)
 save_feature_df(df, "demographic")
 
@@ -222,6 +186,7 @@ def sum_table(table, agg_col):
 def count_table(table, agg_col):
     df = table.groupBy("vip_main_no").agg(f.countDistinct(agg_col).alias(agg_col))
     return df
+
 
 # COMMAND ----------
 
@@ -266,7 +231,7 @@ transactional_feature = (
 # COMMAND ----------
 
 # avg_item_value
-transactional_feature = transactional_feature.withColumn("avg_item_value", f.col("net_amt_hkd")/f.col("sold_qty"))
+transactional_feature = transactional_feature.withColumn("avg_item_value", f.col("net_amt_hkd") / f.col("sold_qty"))
 
 # COMMAND ----------
 
@@ -278,18 +243,12 @@ print(percentile_80th_cutoff, percentile_30th_cutoff)
 # COMMAND ----------
 
 transactional_feature = transactional_feature.withColumn("price_point",
-    f.when(f.col("net_amt_hkd") > percentile_80th_cutoff, 2) # H
-    .when(f.col("net_amt_hkd") < percentile_30th_cutoff, 0) # L
-    .otherwise(1) # M
-)
-
-# COMMAND ----------
-
-display(transactional_feature)
-
-# COMMAND ----------
-
+                                                         f.when(f.col("net_amt_hkd") > percentile_80th_cutoff, 2)  # H
+                                                         .when(f.col("net_amt_hkd") < percentile_30th_cutoff, 0)  # L
+                                                         .otherwise(1)  # M
+                                                         )
 save_feature_df(transactional_feature, "transactional")
+
 
 # COMMAND ----------
 
@@ -308,33 +267,20 @@ def share_of_wallet(by="item_subcat_desc_cleaned", postfix="_SOW_by_subcat"):
     columns_to_keep = ["vip_main_no"] + [c + postfix for c in columns_to_sum]
     return result.select(*columns_to_keep)
 
+
 # COMMAND ----------
 
 share_of_wallet_subcat = share_of_wallet(by="item_subcat_desc_cleaned", postfix="_SOW_by_subcat")
-display(share_of_wallet_subcat)
-
-# COMMAND ----------
-
 save_feature_df(share_of_wallet_subcat, "share_of_wallet_subcat")
 
 # COMMAND ----------
 
 share_of_wallet_maincat = share_of_wallet(by="maincat_desc_cleaned", postfix="_SOW_by_maincat")
-display(share_of_wallet_maincat)
-
-# COMMAND ----------
-
 save_feature_df(share_of_wallet_maincat, "share_of_wallet_maincat")
 
 # COMMAND ----------
 
 share_of_wallet_brand = share_of_wallet(by="prod_brand", postfix="_SOW_by_brand")
-display(share_of_wallet_brand)
-
-# COMMAND ----------
-
 save_feature_df(share_of_wallet_brand, "share_of_wallet_brand")
 
 # COMMAND ----------
-
-
