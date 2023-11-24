@@ -11,6 +11,16 @@ item_attr_tagging = spark.read.parquet(os.path.join(base_dir, "item_attr_tagging
 
 # COMMAND ----------
 
+feature_dir = "/mnt/dev/customer_segmentation/imx/joyce_beauty/features"
+os.makedirs(feature_dir, exist_ok=True)
+
+# COMMAND ----------
+
+def save_feature_df(df, filename):
+    df.write.parquet(os.path.join(feature_dir, f"{filename}.parquet"), mode="overwrite")
+
+# COMMAND ----------
+
 sales.createOrReplaceTempView("sales0")
 vip.createOrReplaceTempView("vip")
 first_purchase.createOrReplaceTempView("first_purchase")
@@ -67,13 +77,29 @@ display(subcat)
 
 # COMMAND ----------
 
+save_feature_df(subcat, "subcat")
+
+# COMMAND ----------
+
 maincat = count_encoding("maincat_desc_cleaned", prefix="maincat_")
 display(maincat)
 
 # COMMAND ----------
 
+save_feature_df(maincat, "maincat")
+
+# COMMAND ----------
+
 prod_brand = count_encoding("prod_brand", prefix="brand_")
 display(prod_brand)
+
+# COMMAND ----------
+
+save_feature_df(prod_brand, "brand")
+
+# COMMAND ----------
+
+display(sales)
 
 # COMMAND ----------
 
@@ -85,68 +111,101 @@ display(tagging)
 
 # COMMAND ----------
 
+save_feature_df(tagging, "tagging")
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC demographic
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC with tenure as (
-# MAGIC   Select
-# MAGIC     vip_main_no,
-# MAGIC     first_pur_jb,
-# MAGIC     round(
-# MAGIC       datediff(
-# MAGIC         TO_DATE("20231031", "yyyyMMdd"),
-# MAGIC         first_pur_jb
-# MAGIC       ) / 365,
-# MAGIC       0
-# MAGIC     ) as tenure
-# MAGIC   from
-# MAGIC     first_purchase
-# MAGIC )
-# MAGIC select
-# MAGIC   vip_main_no,
-# MAGIC   min(
-# MAGIC     case
-# MAGIC       when customer_sex = "C"
-# MAGIC       OR isnull(customer_sex) = 1
-# MAGIC       OR customer_sex = "" then "C"
-# MAGIC       else customer_sex
-# MAGIC     end
-# MAGIC   ) as customer_sex,
-# MAGIC   min(
-# MAGIC     case
-# MAGIC       when cust_nat_cat = "Hong Kong" then "Hong Kong"
-# MAGIC       when cust_nat_cat = "Mainland China" then "Mainland China"
-# MAGIC       when cust_nat_cat = "Macau" then "Macau"
-# MAGIC       else "Others"
-# MAGIC     end
-# MAGIC   ) as cust_nat_cat,
-# MAGIC   case
-# MAGIC     when tenure <= 1 then '0-1'
-# MAGIC     when tenure > 1
-# MAGIC     and tenure <= 3 then '1-3'
-# MAGIC     when tenure > 3
-# MAGIC     and tenure <= 7 then '3-7'
-# MAGIC     else '8+'
-# MAGIC   end as tenure,
-# MAGIC   case 
-# MAGIC     when customer_age_group = '01' then '< 25'
-# MAGIC     when customer_age_group = '02' then '26 - 30'
-# MAGIC     when customer_age_group = '03' then '31 - 35'
-# MAGIC     when customer_age_group = '04' then '36 - 40'
-# MAGIC     when customer_age_group = '05' then '41 - 50'
-# MAGIC     when customer_age_group = '06' then '> 51'
-# MAGIC     when customer_age_group = '07' then null
-# MAGIC   else null end as age
-# MAGIC from
-# MAGIC   sales
-# MAGIC   left join tenure using (vip_main_no)
-# MAGIC group by
-# MAGIC   1,
-# MAGIC   4,
-# MAGIC   5
+demographic = spark.sql("""with tenure as (
+  Select
+    distinct
+    vip_main_no,
+    first_pur_jb,
+    round(
+      datediff(
+        TO_DATE("20231031", "yyyyMMdd"),
+        first_pur_jb
+      ) / 365,
+      0
+    ) as tenure
+  from
+    first_purchase
+)
+select
+  vip_main_no,
+  min(
+    case
+      when customer_sex = "C"
+      OR isnull(customer_sex) = 1
+      OR customer_sex = "" then "C"
+      else customer_sex
+    end
+  ) as customer_sex,
+  min(
+    case
+      when cust_nat_cat = "Hong Kong" then "Hong Kong"
+      when cust_nat_cat = "Mainland China" then "Mainland China"
+      when cust_nat_cat = "Macau" then "Macau"
+      else "Others"
+    end
+  ) as cust_nat_cat,
+  case
+    when tenure <= 1 then '0-1'
+    when tenure > 1
+    and tenure <= 3 then '1-3'
+    when tenure > 3
+    and tenure <= 7 then '3-7'
+    else '8+'
+  end as tenure,
+  max(case 
+    when customer_age_group = '01' then '< 25'
+    when customer_age_group = '02' then '26 - 30'
+    when customer_age_group = '03' then '31 - 35'
+    when customer_age_group = '04' then '36 - 40'
+    when customer_age_group = '05' then '41 - 50'
+    when customer_age_group = '06' then '> 51'
+    when customer_age_group = '07' then null
+  else null end) as age
+from
+  sales
+  left join tenure using (vip_main_no)
+group by
+  1,
+  4
+""")
+
+# COMMAND ----------
+
+demographic.count()
+
+# COMMAND ----------
+
+display(demographic)
+
+# COMMAND ----------
+
+demo = demographic.toPandas()
+
+# COMMAND ----------
+
+demo
+
+# COMMAND ----------
+
+import pandas as pd
+
+
+encoded_df = pd.get_dummies(demo, columns=["customer_sex", "cust_nat_cat", "tenure", "age"])
+encoded_df
+
+# COMMAND ----------
+
+df = spark.createDataFrame(encoded_df)
+save_feature_df(df, "demographic")
 
 # COMMAND ----------
 
@@ -219,14 +278,18 @@ print(percentile_80th_cutoff, percentile_30th_cutoff)
 # COMMAND ----------
 
 transactional_feature = transactional_feature.withColumn("price_point",
-    f.when(f.col("net_amt_hkd") > percentile_80th_cutoff, "H")
-    .when(f.col("net_amt_hkd") < percentile_30th_cutoff, "L")
-    .otherwise("M")
+    f.when(f.col("net_amt_hkd") > percentile_80th_cutoff, 2) # H
+    .when(f.col("net_amt_hkd") < percentile_30th_cutoff, 0) # L
+    .otherwise(1) # M
 )
 
 # COMMAND ----------
 
 display(transactional_feature)
+
+# COMMAND ----------
+
+save_feature_df(transactional_feature, "transactional")
 
 # COMMAND ----------
 
@@ -252,13 +315,25 @@ display(share_of_wallet_subcat)
 
 # COMMAND ----------
 
+save_feature_df(share_of_wallet_subcat, "share_of_wallet_subcat")
+
+# COMMAND ----------
+
 share_of_wallet_maincat = share_of_wallet(by="maincat_desc_cleaned", postfix="_SOW_by_maincat")
 display(share_of_wallet_maincat)
 
 # COMMAND ----------
 
+save_feature_df(share_of_wallet_maincat, "share_of_wallet_maincat")
+
+# COMMAND ----------
+
 share_of_wallet_brand = share_of_wallet(by="prod_brand", postfix="_SOW_by_brand")
 display(share_of_wallet_brand)
+
+# COMMAND ----------
+
+save_feature_df(share_of_wallet_brand, "share_of_wallet_brand")
 
 # COMMAND ----------
 
