@@ -1,31 +1,29 @@
 # Databricks notebook source
+# MAGIC %py
+# MAGIC dbutils.widgets.removeAll()
+# MAGIC dbutils.widgets.text("start_date", "2022-11-01")
+# MAGIC dbutils.widgets.text("end_date", "2023-10-31")
+
+# COMMAND ----------
 import os
+import pyspark.sql.functions as f
 
 base_dir = "/mnt/dev/customer_segmentation/imx/joyce_beauty/datamart"
 
 sales = spark.read.parquet(os.path.join(base_dir, "transaction.parquet"))
 vip = spark.read.parquet(os.path.join(base_dir, "demographic.parquet"))
 first_purchase = spark.read.parquet(os.path.join(base_dir, "first_purchase.parquet"))
-
-# COMMAND ----------
-
 sales.createOrReplaceTempView("sales")
 vip.createOrReplaceTempView("vip")
 first_purchase.createOrReplaceTempView("first_purchase")
 
 # COMMAND ----------
 
-import numpy as np
-
-model_dir = "/dbfs/mnt/dev/customer_segmentation/imx/joyce_beauty/model/"
-
-# COMMAND ----------
-
-persona = spark.read.parquet("/mnt/dev/customer_segmentation/imx/joyce_beauty/model/clustering_result_kmeans_iter1.parquet")
-
-# COMMAND ----------
-
+# clustering result
+persona = spark.read.parquet(
+    "/mnt/dev/customer_segmentation/imx/joyce_beauty/model/clustering_result_kmeans_iter1.parquet")
 persona.createOrReplaceTempView("persona0")
+
 
 # COMMAND ----------
 
@@ -37,23 +35,10 @@ persona.createOrReplaceTempView("persona0")
 # MAGIC   when persona = 1 then "cluster 2"
 # MAGIC   when persona = 2 then "cluster 3"
 # MAGIC   when persona = 3 then "cluster 4" 
-# MAGIC   when persona = 4 then "cluster 4" end as persona
+# MAGIC   when persona = 4 then "cluster 4" end as persona -- the 4 and 5 cluster are merged based on profiling result
 # MAGIC from persona0
 
 # COMMAND ----------
-
-# MAGIC %sql
-# MAGIC select * from persona
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC select maincat_desc, item_subcat_desc, item_subcat_desc_from_csv, count(distinct vip_main_no) from sales
-# MAGIC group by maincat_desc, item_subcat_desc, item_subcat_desc_from_csv
-
-# COMMAND ----------
-
-import pyspark.sql.functions as f
 
 
 def sum_pivot_table(table, group_by_col, agg_col, show_inactive=True):
@@ -75,10 +60,6 @@ def count_pivot_table(table, group_by_col, agg_col, percentage=False, show_inact
     display(pivot_table)
     return pivot_table
 
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC select distinct maincat_desc, item_subcat_desc from sales
 
 # COMMAND ----------
 
@@ -103,11 +84,6 @@ final_sales_table = spark.sql(
     """
 )
 final_sales_table.createOrReplaceTempView("final_sales_table")
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC select count(distinct vip_main_no) from final_sales_table
 
 # COMMAND ----------
 
@@ -177,8 +153,6 @@ group by 1, 3
 
 count_pivot_table(df, group_by_col="tenure", agg_col="vip_main_no")
 
-## ISSUE HERE
-
 # COMMAND ----------
 
 # nationality
@@ -215,7 +189,8 @@ df = spark.sql(
     """
 )
 
-table = count_pivot_table(df, group_by_col="customer_age_group", agg_col="vip_main_no").createOrReplaceTempView("age_gp")
+table = count_pivot_table(df, group_by_col="customer_age_group", agg_col="vip_main_no").createOrReplaceTempView(
+    "age_gp")
 
 # COMMAND ----------
 
@@ -249,7 +224,7 @@ table = count_pivot_table(df, group_by_col="customer_age_group", agg_col="vip_ma
 df = spark.sql(
     """
     select * from final_sales_table
-    where order_date >= "2022-11-01" and order_date <= "2023-10-31"  
+    where order_date >= getArgument("start_date") and order_date <= getArgument("end_date")
     """
 )
 sum_pivot_table(df, group_by_col="dummy", agg_col="net_amt_hkd", show_inactive=False)
@@ -279,7 +254,7 @@ select
   shop_code,
   customer_tag
 from final_sales_table
- where order_date >= "2022-11-01" and order_date <= "2023-10-31"  
+ where order_date >= getArgument("start_date") and order_date <= getArgument("end_date") 
 )
 select 
   vip_main_no,
@@ -300,6 +275,7 @@ group by
 
 sum_pivot_table(visit, group_by_col="dummy", agg_col="visit", show_inactive=False)
 
+
 # COMMAND ----------
 
 # MAGIC %sql
@@ -311,7 +287,7 @@ sum_pivot_table(visit, group_by_col="dummy", agg_col="visit", show_inactive=Fals
 # MAGIC     customer_tag, 
 # MAGIC     count(distinct vip_main_no) as vip_count
 # MAGIC from final_sales_table
-# MAGIC where order_date >= "2022-11-01" and order_date <= "2023-10-31"  
+# MAGIC where order_date >= getArgument("start_date") and order_date <= getArgument("end_date")
 # MAGIC group by 
 # MAGIC     customer_tag,
 # MAGIC     shop_desc
@@ -366,7 +342,8 @@ sum_pivot_table(visit, group_by_col="dummy", agg_col="visit", show_inactive=Fals
 
 # COMMAND ----------
 
-def pivot_table_by_cat(group_by="item_subcat_desc_cleaned", agg_col="net_amt_hkd", mode="sum", table="final_sales_table"):
+def pivot_table_by_cat(group_by="item_subcat_desc_cleaned", agg_col="net_amt_hkd", mode="sum",
+                       table="final_sales_table"):
     df = spark.sql(
         f"""
         select * from
@@ -376,7 +353,7 @@ def pivot_table_by_cat(group_by="item_subcat_desc_cleaned", agg_col="net_amt_hkd
                 customer_tag, 
                 {mode}({agg_col}) as overall_amount
             from {table}
-            where order_date >= "2022-11-01" and order_date <= "2023-10-31"  
+            where order_date >= getArgument("start_date") and order_date <= getArgument("end_date")
             group by 
                 customer_tag,
                 {group_by}
@@ -390,23 +367,24 @@ def pivot_table_by_cat(group_by="item_subcat_desc_cleaned", agg_col="net_amt_hkd
     display(df)
     return df
 
+
 # COMMAND ----------
 
 # by subclass
 
 # COMMAND ----------
 
-# 1. amt table by category and segment
+# 1. amt table by subclass and segment
 pivot_table_by_cat(group_by="item_subcat_desc_cleaned", agg_col="net_amt_hkd", mode="sum")
 
 # COMMAND ----------
 
-# 2. qty table by category and segment
+# 2. qty table by subclass and segment
 pivot_table_by_cat(group_by="item_subcat_desc_cleaned", agg_col="sold_qty", mode="sum")
 
 # COMMAND ----------
 
-# 3. number of member purchase by category and segment
+# 3. number of member purchase by subclass and segment
 pivot_table_by_cat(group_by="item_subcat_desc_cleaned", agg_col="distinct vip_main_no", mode="count")
 
 # COMMAND ----------
@@ -415,17 +393,17 @@ pivot_table_by_cat(group_by="item_subcat_desc_cleaned", agg_col="distinct vip_ma
 
 # COMMAND ----------
 
-# 1. amt table by category and segment
+# 1. amt table by brand and segment
 pivot_table_by_cat(group_by="prod_brand", agg_col="net_amt_hkd", mode="sum")
 
 # COMMAND ----------
 
-# 2. qty table by category and segment
+# 2. qty table by brand and segment
 pivot_table_by_cat(group_by="prod_brand", agg_col="sold_qty", mode="sum")
 
 # COMMAND ----------
 
-# 3. number of member purchase by category and segment
+# 3. number of member purchase by brand and segment
 df = pivot_table_by_cat(group_by="prod_brand", agg_col="distinct vip_main_no", mode="count")
 
 # COMMAND ----------
@@ -435,6 +413,7 @@ df.createOrReplaceTempView("brand")
 # COMMAND ----------
 
 # MAGIC %sql
+# MAGIC -- get brand desc
 # MAGIC select b.*, brand_desc from brand b left join imx_prd.imx_dw_train_silver.dbo_viw_lc_xxx_brand_brand on brand_code = prod_brand
 
 # COMMAND ----------
@@ -443,17 +422,17 @@ df.createOrReplaceTempView("brand")
 
 # COMMAND ----------
 
-# 1. amt table by category and segment
+# 1. amt table by maincat_desc and segment
 pivot_table_by_cat(group_by="maincat_desc_cleaned", agg_col="net_amt_hkd", mode="sum")
 
 # COMMAND ----------
 
-# 2. qty table by category and segment
+# 2. qty table by maincat_desc and segment
 pivot_table_by_cat(group_by="maincat_desc_cleaned", agg_col="sold_qty", mode="sum")
 
 # COMMAND ----------
 
-# 3. number of member purchase by category and segment
+# 3. number of member purchase by maincat_desc and segment
 pivot_table_by_cat(group_by="maincat_desc_cleaned", agg_col="distinct vip_main_no", mode="count")
 
 # COMMAND ----------
@@ -463,76 +442,11 @@ pivot_table_by_cat(group_by="maincat_desc_cleaned", agg_col="distinct vip_main_n
 
 # COMMAND ----------
 
-item_attr = spark.sql("SELECT DISTINCT item_desc, maincat_desc_cleaned, item_subcat_desc_cleaned FROM sales_cleaned").toPandas()
-# item_attr[item_attr["item_desc"].apply(lambda x: "moistur" in x.lower() if x is not None else False)]
-
-# COMMAND ----------
-
-
-def tagging(desc):
-    tags = []
-    for k, v in keywords.items():
-        for keyword in v:
-            if keyword in desc:
-                tags.append(k.upper())
-    return tags
-
-keywords = {
-    "cleanser": ["cleansing", "soothing", "cleanser"],
-    "kids": ["kids", "baby"],
-    "set": ["set", "bundle"],
-    "serum": ["serum"],
-    "moisturizing": ["hydrat", "moistur", "moist"],
-    "repairing": ["repair", "restor"],
-    "whitening/rejuvenate": ["glow", "brighten", "radian", "whiten", "rejuvenat", "shine", "AGING"],
-    "shampoo/conditioners": ["shampoo", "conditioners"],
-    "wash": ["wash"],
-    "volum": ["volum"],
-    "lotion": ["lotion"],
-    "cream": ["cream"],
-    "eye": ["eye"],
-    "oil": ["oil"],
-    "fragrance": ["perfume", "edp", "fragrance", "edt", "parfum"],
-    "lip": ["lip"],
-    "candle/diffuser": ["candle", "diffuser"],
-    "mask": ["mask"],
-    "refill": ["refil"],
-    "gwp": ["gwp"],
-    "gold/diamond": ["gold", "diamond"],
-    "brush/pencil": ["brush", "pencil"],
-    "dental": ["tooth", "teeth"],
-    "XM\GIFT\CHRISTMAS": ["xm", "gift", "christmas"],
-    "gel": ["gel"],
-    "SPRAY": ["spray", "mist"],
-    "SUNSCREEN": ["sunscreen", "spf"],
-    "BLUSH": ["blush"],
-    "FOUNDATION": ["foundation"],
-    "COUPONS": ["coupons", "cash voucher"],
-    "ANTIOXIDANT": ["antioxidant"],
-}
-
-item_attr["tags"] = item_attr["item_desc"].apply(lambda x: tagging(x.lower())if x is not None else [])
-
-# COMMAND ----------
-
-spark.createDataFrame(item_attr).write.parquet(os.path.join(base_dir, "item_attr_tagging.parquet"), mode="overwrite")
-
-# COMMAND ----------
-
-display(item_attr[item_attr["tags"].apply(lambda x: len(x) == 0)])
-
-# COMMAND ----------
-
+item_attr = spark.read.parquet(os.path.join(base_dir, "item_attr_tagging.parquet")).toPandas()
 item_attr_exploded = item_attr.explode("tags")
-
-# COMMAND ----------
-
-display(item_attr_exploded)
-
-# COMMAND ----------
-
 item_attr_exploded_spark = spark.createDataFrame(item_attr_exploded)
-final_sales_table_with_tags = final_sales_table.join(item_attr_exploded_spark.select("item_desc", "tags"), on="item_desc", how="left")
+final_sales_table_with_tags = final_sales_table.join(item_attr_exploded_spark.select("item_desc", "tags"),
+                                                     on="item_desc", how="left")
 
 # COMMAND ----------
 
@@ -540,19 +454,17 @@ final_sales_table_with_tags.createOrReplaceTempView("final_sales_table_with_tags
 
 # COMMAND ----------
 
-# 1. amt table by category and segment
+# 1. amt table by tag and segment
 pivot_table_by_cat(group_by="tags", agg_col="net_amt_hkd", mode="sum", table="final_sales_table_with_tags")
 
 # COMMAND ----------
 
-# 2. qty table by category and segment
+# 2. qty table by tag and segment
 pivot_table_by_cat(group_by="tags", agg_col="sold_qty", mode="sum", table="final_sales_table_with_tags")
 
 # COMMAND ----------
 
-# 3. number of member purchase by category and segment
+# 3. number of member purchase by tag and segment
 pivot_table_by_cat(group_by="tags", agg_col="distinct vip_main_no", mode="count", table="final_sales_table_with_tags")
 
 # COMMAND ----------
-
-
