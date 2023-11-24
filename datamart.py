@@ -1,4 +1,11 @@
 # Databricks notebook source
+# MAGIC %py
+# MAGIC dbutils.widgets.removeAll()
+# MAGIC dbutils.widgets.text("start_date", "2022-11-01")
+# MAGIC dbutils.widgets.text("end_date", "2023-10-31")
+
+# COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## transaction data
 
@@ -79,7 +86,7 @@ df.createOrReplaceTempView("RawSales")
 # MAGIC   INNER JOIN qty_table b ON a.sales_main_key = b.sales_main_key
 # MAGIC WHERE
 # MAGIC   total_qty != 0
-# MAGIC   AND order_date >= "2022-11-01" AND order_date <= "2023-10-31" 
+# MAGIC   AND order_date >= getArgument("start_date") AND order_date <= getArgument("end_date")
 # MAGIC   AND shop_brand = 'JB'
 
 # COMMAND ----------
