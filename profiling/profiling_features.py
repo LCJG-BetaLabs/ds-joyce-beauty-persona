@@ -5,6 +5,7 @@
 # MAGIC dbutils.widgets.text("end_date", "2023-10-31")
 
 # COMMAND ----------
+
 import os
 import pyspark.sql.functions as f
 
@@ -77,13 +78,69 @@ def count_pivot_table(table, group_by_col, agg_col, percentage=False, show_inact
 
 # COMMAND ----------
 
+# MAGIC %sql
+# MAGIC CREATE OR REPLACE TEMP VIEW sales_cleaned2 AS
+# MAGIC select 
+# MAGIC   *,
+# MAGIC   concat(maincat_desc_cleaned, " - ", item_subcat_desc_cleaned) as maincat_and_subcat 
+# MAGIC from sales_cleaned
+
+# COMMAND ----------
+
 final_sales_table = spark.sql(
     """
-    select *, 1 as dummy, persona as customer_tag from sales_cleaned
+    select *, 1 as dummy, persona as customer_tag from sales_cleaned2
     inner join persona using (vip_main_no)
     """
 )
 final_sales_table.createOrReplaceTempView("final_sales_table")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC provide minimum visit for beautyholic, take 80th percentile if less than 3
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC create
+# MAGIC or replace temporary view visit as
+# MAGIC with visit0 as (
+# MAGIC select
+# MAGIC   distinct vip_main_no,
+# MAGIC   order_date,
+# MAGIC   shop_code,
+# MAGIC   customer_tag
+# MAGIC from final_sales_table
+# MAGIC  where order_date >= getArgument("start_date") and order_date <= getArgument("end_date") 
+# MAGIC )
+# MAGIC select 
+# MAGIC   vip_main_no,
+# MAGIC   customer_tag,
+# MAGIC   count(distinct vip_main_no,
+# MAGIC   order_date,
+# MAGIC   shop_code) as visit,
+# MAGIC   1 as dummy
+# MAGIC from visit0
+# MAGIC group by
+# MAGIC   vip_main_no,
+# MAGIC   customer_tag
+
+# COMMAND ----------
+
+df = spark.sql("""select
+  distinct vip_main_no,
+  new_joiner_flag,
+  visit,
+  persona as customer_tag
+from
+  new_joiner
+  inner join visit using (vip_main_no)
+  inner join persona using (vip_main_no)
+where persona = "cluster 2"
+""")
+
+cluster2_visit = count_pivot_table(df, group_by_col="visit", agg_col="vip_main_no")
 
 # COMMAND ----------
 
@@ -370,6 +427,25 @@ def pivot_table_by_cat(group_by="item_subcat_desc_cleaned", agg_col="net_amt_hkd
 
 # COMMAND ----------
 
+# by maincat and subcat
+
+# COMMAND ----------
+
+# 1. amt table by subclass and segment
+pivot_table_by_cat(group_by="maincat_and_subcat", agg_col="net_amt_hkd", mode="sum")
+
+# COMMAND ----------
+
+# 2. qty table by subclass and segment
+pivot_table_by_cat(group_by="maincat_and_subcat", agg_col="sold_qty", mode="sum")
+
+# COMMAND ----------
+
+# 3. number of member purchase by subclass and segment
+pivot_table_by_cat(group_by="maincat_and_subcat", agg_col="distinct vip_main_no", mode="count")
+
+# COMMAND ----------
+
 # by subclass
 
 # COMMAND ----------
@@ -468,3 +544,10 @@ pivot_table_by_cat(group_by="tags", agg_col="sold_qty", mode="sum", table="final
 pivot_table_by_cat(group_by="tags", agg_col="distinct vip_main_no", mode="count", table="final_sales_table_with_tags")
 
 # COMMAND ----------
+
+# MAGIC %md
+# MAGIC cross class purchase (# of customer)
+
+# COMMAND ----------
+
+
