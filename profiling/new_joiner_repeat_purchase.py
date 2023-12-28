@@ -133,6 +133,22 @@ final_sales_table.createOrReplaceTempView("final_sales_table")
 
 # COMMAND ----------
 
+df = spark.sql("""select
+  distinct vip_main_no,
+  new_joiner_flag,
+  visit,
+  persona as customer_tag
+from
+  new_joiner
+  inner join visit using (vip_main_no)
+  inner join persona using (vip_main_no)
+where persona = "Beautyholic"
+""")
+
+cluster2_visit = count_pivot_table(df, group_by_col="visit", agg_col="vip_main_no")
+
+# COMMAND ----------
+
 def pivot_table_by_cat(
     table, group_by="item_subcat_desc_cleaned", agg_col="net_amt_hkd", mode="sum"
 ):
