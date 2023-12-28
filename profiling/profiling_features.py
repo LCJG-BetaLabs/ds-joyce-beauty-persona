@@ -427,6 +427,28 @@ cluster_order
 # COMMAND ----------
 
 # MAGIC %sql
+# MAGIC select * from
+# MAGIC (select 
+# MAGIC     distinct shop_desc,
+# MAGIC     customer_tag, 
+# MAGIC     sum(net_amt_hkd) as amt
+# MAGIC from final_sales_table
+# MAGIC where order_date >= getArgument("start_date") and order_date <= getArgument("end_date")
+# MAGIC group by 
+# MAGIC     customer_tag,
+# MAGIC     shop_desc
+# MAGIC )
+# MAGIC PIVOT (
+# MAGIC   SUM(amt)
+# MAGIC   FOR customer_tag IN ('Beautyholic',
+# MAGIC  'Beauty Accessories and Devices Lover',
+# MAGIC  'Value Shoppers',
+# MAGIC  'Personal Care Enthusiasts')
+# MAGIC ) 
+
+# COMMAND ----------
+
+# MAGIC %sql
 # MAGIC -- Member penetration by month
 # MAGIC -- cust count by yearmon and segment
 # MAGIC select
@@ -453,6 +475,38 @@ cluster_order
 # MAGIC       yyyymm
 # MAGIC   ) PIVOT (
 # MAGIC     SUM(vip_count) FOR customer_tag IN ('Beautyholic',
+# MAGIC  'Beauty Accessories and Devices Lover',
+# MAGIC  'Value Shoppers',
+# MAGIC  'Personal Care Enthusiasts')
+# MAGIC   )
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC select
+# MAGIC   *
+# MAGIC from
+# MAGIC   (
+# MAGIC     select
+# MAGIC       distinct yyyymm,
+# MAGIC       customer_tag,
+# MAGIC       sum(net_amt_hkd) as amt
+# MAGIC     from
+# MAGIC       (
+# MAGIC         select
+# MAGIC           *,
+# MAGIC           CONCAT(
+# MAGIC             year(order_date),
+# MAGIC             LPAD(month(order_date), 2, '0')
+# MAGIC           ) as yyyymm
+# MAGIC         from
+# MAGIC           final_sales_table
+# MAGIC       )
+# MAGIC     group by
+# MAGIC       customer_tag,
+# MAGIC       yyyymm
+# MAGIC   ) PIVOT (
+# MAGIC     SUM(amt) FOR customer_tag IN ('Beautyholic',
 # MAGIC  'Beauty Accessories and Devices Lover',
 # MAGIC  'Value Shoppers',
 # MAGIC  'Personal Care Enthusiasts')
