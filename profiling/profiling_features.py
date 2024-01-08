@@ -31,11 +31,11 @@ persona.createOrReplaceTempView("persona0")
 # MAGIC %md
 # MAGIC persona
 # MAGIC
-# MAGIC 0: Beauty Accessories and Devices Lover
+# MAGIC 0: Beauty Devices Lover
 # MAGIC
 # MAGIC 1: Beautyholic
 # MAGIC
-# MAGIC 2: Value Shoppers
+# MAGIC 2: Skincare Addicts
 # MAGIC
 # MAGIC 3&4: Personal Care Enthusiasts
 
@@ -45,16 +45,16 @@ persona.createOrReplaceTempView("persona0")
 # MAGIC create or replace temp view persona as
 # MAGIC select 
 # MAGIC   vip_main_no,
-# MAGIC   case when persona = 0 then "Beauty Accessories and Devices Lover"
+# MAGIC   case when persona = 0 then "Beauty Devices Lover"
 # MAGIC   when persona = 1 then "Beautyholic"
-# MAGIC   when persona = 2 then "Value Shoppers"
+# MAGIC   when persona = 2 then "Skincare Addicts"
 # MAGIC   when persona = 3 then "Personal Care Enthusiasts" 
 # MAGIC   when persona = 4 then "Personal Care Enthusiasts" end as persona -- the 4 and 5 cluster are merged based on profiling result
 # MAGIC from persona0
 
 # COMMAND ----------
 
-cluster_order = ["Beautyholic", "Beauty Accessories and Devices Lover", "Value Shoppers", "Personal Care Enthusiasts"]
+cluster_order = ["Beautyholic", "Beauty Devices Lover", "Skincare Addicts", "Personal Care Enthusiasts"]
 
 # COMMAND ----------
 
@@ -116,7 +116,7 @@ final_sales_table.createOrReplaceTempView("final_sales_table0")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Hardcode remove move customers who purchased SLIP SILK only in device and beauty lover to personal care enthusiast group
+# MAGIC Hardcode move customers who purchased SLIP SILK only in device and beauty lover to personal care enthusiast group
 # MAGIC (based on business users requests)
 
 # COMMAND ----------
@@ -164,7 +164,7 @@ final_sales_table.createOrReplaceTempView("final_sales_table0")
 # MAGIC   persona,
 # MAGIC   dummy,
 # MAGIC   CASE
-# MAGIC     WHEN c.customer_tag = 'Beauty Accessories and Devices Lover' THEN 'Personal Care Enthusiasts'
+# MAGIC     WHEN c.customer_tag = 'Beauty Devices Lover' THEN 'Personal Care Enthusiasts'
 # MAGIC     ELSE c.customer_tag
 # MAGIC   END AS customer_tag
 # MAGIC FROM
@@ -176,7 +176,7 @@ final_sales_table.createOrReplaceTempView("final_sales_table0")
 # MAGIC     FROM
 # MAGIC       final_sales_table0 p
 # MAGIC     WHERE
-# MAGIC       p.prod_brand = 'JBSLP'
+# MAGIC       p.prod_brand in ('JBSLP', 'JBAQU', 'JBRUB')
 # MAGIC     GROUP BY
 # MAGIC       p.vip_main_no
 # MAGIC     HAVING
@@ -194,7 +194,7 @@ final_sales_table.createOrReplaceTempView("final_sales_table0")
 # MAGIC     FROM
 # MAGIC       final_sales_table0 p
 # MAGIC     WHERE
-# MAGIC       p.prod_brand = 'JBSLP'
+# MAGIC       p.prod_brand in ('JBSLP', 'JBAQU', 'JBRUB')
 # MAGIC     GROUP BY
 # MAGIC       p.vip_main_no
 # MAGIC     HAVING
@@ -327,8 +327,8 @@ table = count_pivot_table(df, group_by_col="customer_age_group", agg_col="vip_ma
 # MAGIC     when customer_age_group = '07' then null
 # MAGIC   else null end as age,
 # MAGIC   sum(`Beautyholic`),
-# MAGIC   sum(`Beauty Accessories and Devices Lover`),
-# MAGIC   sum(`Value Shoppers`),
+# MAGIC   sum(`Beauty Devices Lover`),
+# MAGIC   sum(`Skincare Addicts`),
 # MAGIC   sum(`Personal Care Enthusiasts`)
 # MAGIC from age_gp
 # MAGIC group by age
@@ -419,8 +419,8 @@ cluster_order
 # MAGIC PIVOT (
 # MAGIC   SUM(vip_count)
 # MAGIC   FOR customer_tag IN ('Beautyholic',
-# MAGIC  'Beauty Accessories and Devices Lover',
-# MAGIC  'Value Shoppers',
+# MAGIC  'Beauty Devices Lover',
+# MAGIC  'Skincare Addicts',
 # MAGIC  'Personal Care Enthusiasts')
 # MAGIC ) 
 
@@ -441,8 +441,8 @@ cluster_order
 # MAGIC PIVOT (
 # MAGIC   SUM(amt)
 # MAGIC   FOR customer_tag IN ('Beautyholic',
-# MAGIC  'Beauty Accessories and Devices Lover',
-# MAGIC  'Value Shoppers',
+# MAGIC  'Beauty Devices Lover',
+# MAGIC  'Skincare Addicts',
 # MAGIC  'Personal Care Enthusiasts')
 # MAGIC ) 
 
@@ -475,8 +475,8 @@ cluster_order
 # MAGIC       yyyymm
 # MAGIC   ) PIVOT (
 # MAGIC     SUM(vip_count) FOR customer_tag IN ('Beautyholic',
-# MAGIC  'Beauty Accessories and Devices Lover',
-# MAGIC  'Value Shoppers',
+# MAGIC  'Beauty Devices Lover',
+# MAGIC  'Skincare Addicts',
 # MAGIC  'Personal Care Enthusiasts')
 # MAGIC   )
 
@@ -507,8 +507,8 @@ cluster_order
 # MAGIC       yyyymm
 # MAGIC   ) PIVOT (
 # MAGIC     SUM(amt) FOR customer_tag IN ('Beautyholic',
-# MAGIC  'Beauty Accessories and Devices Lover',
-# MAGIC  'Value Shoppers',
+# MAGIC  'Beauty Devices Lover',
+# MAGIC  'Skincare Addicts',
 # MAGIC  'Personal Care Enthusiasts')
 # MAGIC   )
 
@@ -545,8 +545,8 @@ def pivot_table_by_cat(group_by="item_subcat_desc_cleaned", agg_col="net_amt_hkd
             PIVOT (
             SUM(overall_amount)
             FOR customer_tag IN ('Beautyholic',
- 'Beauty Accessories and Devices Lover',
- 'Value Shoppers',
+ 'Beauty Devices Lover',
+ 'Skincare Addicts',
  'Personal Care Enthusiasts')
             ) 
         """
