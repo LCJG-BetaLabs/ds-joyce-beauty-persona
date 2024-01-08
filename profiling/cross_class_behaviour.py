@@ -20,7 +20,7 @@ persona.createOrReplaceTempView("persona0")
 
 # COMMAND ----------
 
-cluster_order = ["Beautyholic", "Beauty Accessories and Devices Lover", "Value Shoppers", "Personal Care Enthusiasts"]
+cluster_order = ["Beautyholic", "Beauty Devices Lover", "Skincare Addicts", "Personal Care Enthusiasts"]
 
 # COMMAND ----------
 
@@ -51,9 +51,9 @@ def count_pivot_table(table, group_by_col, agg_col, percentage=False, show_inact
 # MAGIC create or replace temp view persona as
 # MAGIC select 
 # MAGIC   vip_main_no,
-# MAGIC   case when persona = 0 then "Beauty Accessories and Devices Lover"
+# MAGIC   case when persona = 0 then "Beauty Devices Lover"
 # MAGIC   when persona = 1 then "Beautyholic"
-# MAGIC   when persona = 2 then "Value Shoppers"
+# MAGIC   when persona = 2 then "Skincare Addicts"
 # MAGIC   when persona = 3 then "Personal Care Enthusiasts" 
 # MAGIC   when persona = 4 then "Personal Care Enthusiasts" end as persona -- the 4 and 5 cluster are merged based on profiling result
 # MAGIC from persona0
@@ -137,7 +137,7 @@ final_sales_table.createOrReplaceTempView("final_sales_table0")
 # MAGIC   persona,
 # MAGIC   dummy,
 # MAGIC   CASE
-# MAGIC     WHEN c.customer_tag = 'Beauty Accessories and Devices Lover' THEN 'Personal Care Enthusiasts'
+# MAGIC     WHEN c.customer_tag = 'Beauty Devices Lover' THEN 'Personal Care Enthusiasts'
 # MAGIC     ELSE c.customer_tag
 # MAGIC   END AS customer_tag
 # MAGIC FROM
@@ -149,7 +149,7 @@ final_sales_table.createOrReplaceTempView("final_sales_table0")
 # MAGIC     FROM
 # MAGIC       final_sales_table0 p
 # MAGIC     WHERE
-# MAGIC       p.prod_brand = 'JBSLP'
+# MAGIC       p.prod_brand in ('JBSLP', 'JBAQU', 'JBRUB')
 # MAGIC     GROUP BY
 # MAGIC       p.vip_main_no
 # MAGIC     HAVING
@@ -167,7 +167,7 @@ final_sales_table.createOrReplaceTempView("final_sales_table0")
 # MAGIC     FROM
 # MAGIC       final_sales_table0 p
 # MAGIC     WHERE
-# MAGIC       p.prod_brand = 'JBSLP'
+# MAGIC       p.prod_brand in ('JBSLP', 'JBAQU', 'JBRUB')
 # MAGIC     GROUP BY
 # MAGIC       p.vip_main_no
 # MAGIC     HAVING
