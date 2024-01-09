@@ -184,7 +184,7 @@ import pandas as pd
 
 
 def get_cross_class_pivot_table(
-    persona="cluster 1",
+    customer_tag,
     _class="maincat_desc_cleaned",
     aggfunc=lambda x: len(x.unique()),
     values="vip_main_no",
@@ -199,7 +199,7 @@ def get_cross_class_pivot_table(
             maincat_desc_cleaned,
             maincat_and_subcat
         from final_sales_table 
-        where persona = '{persona}' and
+        where customer_tag = '{customer_tag}' and
         maincat_desc_cleaned not in ("Life-styled", "Unknown", "Take-In")
     """
     ).toPandas()
@@ -222,34 +222,10 @@ def get_cross_class_pivot_table(
 # vip count
 for i in range(4):
     df = get_cross_class_pivot_table(
-        persona=cluster_order[i],
+        customer_tag=cluster_order[i],
         _class="maincat_desc_cleaned",
         aggfunc=lambda x: len(x.unique()),
         values="vip_main_no",
-    )
-    display(df)
-
-# COMMAND ----------
-
-# vip count
-for i in range(4):
-    df = get_cross_class_pivot_table(
-        persona=cluster_order[i],
-        _class="maincat_and_subcat",
-        aggfunc=lambda x: len(x.unique()),
-        values="vip_main_no",
-    )
-    display(df)
-
-# COMMAND ----------
-
-# amt
-for i in range(4):
-    df = get_cross_class_pivot_table(
-        persona=cluster_order[i],
-        _class="maincat_desc_cleaned",
-        aggfunc="sum",
-        values="net_amt_hkd",
     )
     display(df)
 
